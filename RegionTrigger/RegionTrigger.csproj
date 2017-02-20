@@ -51,6 +51,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CnNameAttribute.cs" />
     <Compile Include="Events.cs" />
     <Compile Include="RegionTrigger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
