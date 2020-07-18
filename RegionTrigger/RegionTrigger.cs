@@ -170,19 +170,13 @@ namespace RegionTrigger
 		}
 
 		void OnRegionDeleted(RegionHooks.RegionDeletedEventArgs args)
-		{
-			RtRegions.DeleteRtRegion(args.Region.ID);
-		}
-
+			=>RtRegions.DeleteRtRegion(args.Region.ID);
 		static void OnPlayerPermission(PlayerPermissionEventArgs args)
 		{
 			var rt = RtPlayer.GetPlayerInfo(args.Player).CurrentRegion;
-
-			if (rt?.HasEvent(Event.TempPermission) != true)
-				return;
-
-			if (rt.HasPermission(args.Permission) && !args.Player.HasPermission("regiontrigger.bypass.tempperm"))
-				args.Handled = true;
+            if (rt?.HasEvent(Event.TempPermission) != true) return;
+            if (rt.HasPermission(args.Permission) && !args.Player.HasPermission("regiontrigger.bypass.tempperm"))
+				args.Result=PermissionHookResult.Granted;
 		}
 
 		private static void OnRegionLeft(TSPlayer player, RtRegion region, RtPlayer data)
@@ -286,7 +280,7 @@ namespace RegionTrigger
 
 			if (rt.HasEvent(Event.Private) && !player.HasPermission("regiontrigger.bypass.private"))
 			{
-				player.Spawn();
+				player.Spawn(PlayerSpawnContext.RecallFromItem);
 				player.SendErrorMessage("你踏入了不该踏入之地。");
 			}
 		}
@@ -439,13 +433,9 @@ namespace RegionTrigger
 						case "ib":
 							var items = TShock.Utils.GetItemByIdOrName(propValue);
 							if (items.Count == 0)
-							{
-								args.Player.SendErrorMessage("Invalid item.");
-							}
+								args.Player.SendErrorMessage("无效的物品.");
 							else if (items.Count > 1)
-							{
-								TShock.Utils.SendMultipleMatchError(args.Player, items.Select(i => i.Name));
-							}
+								args.Player.SendMultipleMatchError(items.Select(i => i.Name));
 							else
 							{
 								if (!isDel)
