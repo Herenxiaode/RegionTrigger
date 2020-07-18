@@ -17,17 +17,14 @@ namespace RegionTrigger
 	public sealed class RegionTrigger : TerrariaPlugin
 	{
 		internal RtRegionManager RtRegions;
-
 		public override string Name => "RegionTrigger";
-
 		public override string Author => "MistZZT";
-
 		public override Version Version => GetType().Assembly.GetName().Version;
-
 		public override string Description => "Perform actions in regions where players are active.";
 
-		public RegionTrigger(Main game) : base(game) { }
+		DateTime _lastCheck = DateTime.UtcNow;
 
+		public RegionTrigger(Main game) : base(game) { }
 		public override void Initialize()
 		{
 			ServerApi.Hooks.GameInitialize.Register(this, OnInitialize, -10);
@@ -43,7 +40,6 @@ namespace RegionTrigger
 			RegionHooks.RegionDeleted += OnRegionDeleted;
 			PlayerHooks.PlayerPermission += OnPlayerPermission;
 		}
-
 		protected override void Dispose(bool disposing)
 		{
 			if (disposing)
@@ -64,26 +60,17 @@ namespace RegionTrigger
 			base.Dispose(disposing);
 		}
 
-		private void OnInitialize(EventArgs args)
+		void OnInitialize(EventArgs args)
 		{
 			Commands.ChatCommands.Add(new Command("regiontrigger.manage", RegionSetProperties, "rt"));
-
 			RtRegions = new RtRegionManager(TShock.DB);
 		}
 
-		private void OnPostInit(EventArgs args)
-		{
-			RtRegions.Reload();
-		}
+		void OnPostInit(EventArgs args)=>RtRegions.Reload();
+		static void OnGreetPlayer(GreetPlayerEventArgs args)
+			=>RtPlayer.GetPlayerInfo(TShock.Players[args.Who]);
 
-		private static void OnGreetPlayer(GreetPlayerEventArgs args)
-		{
-			RtPlayer.GetPlayerInfo(TShock.Players[args.Who]);
-		}
-
-		private DateTime _lastCheck = DateTime.UtcNow;
-
-		private void OnUpdate(EventArgs args)
+		void OnUpdate(EventArgs args)
 		{
 			if ((DateTime.UtcNow - _lastCheck).TotalSeconds >= 1)
 			{
@@ -92,7 +79,7 @@ namespace RegionTrigger
 			}
 		}
 
-		private static void OnTogglePvp(object sender, GetDataHandlers.TogglePvpEventArgs args)
+		static void OnTogglePvp(object sender, GetDataHandlers.TogglePvpEventArgs args)
 		{
 			var ply = TShock.Players[args.PlayerId];
 			var dt = RtPlayer.GetPlayerInfo(ply);
@@ -107,16 +94,11 @@ namespace RegionTrigger
 			}
 		}
 
-		private void OnTileEdit(object sender, GetDataHandlers.TileEditEventArgs args)
+		void OnTileEdit(object sender, GetDataHandlers.TileEditEventArgs args)
 		{
-			if (args.Action != GetDataHandlers.EditAction.PlaceTile)
-				return;
-
+			if (args.Action != GetDataHandlers.EditAction.PlaceTile)return;
 			var rt = RtRegions.GetTopRegion(RtRegions.Regions.Where(r => r.Region.InArea(args.X, args.Y)));
-
-			if (rt?.HasEvent(Event.Tileban) != true)
-				return;
-
+			if (rt?.HasEvent(Event.Tileban) != true)return;
 			if (rt.TileIsBanned(args.EditData) && !args.Player.HasPermission("regiontrigger.bypass.tileban"))
 			{
 				args.Player.SendTileSquare(args.X, args.Y, 1);
@@ -125,30 +107,23 @@ namespace RegionTrigger
 			}
 		}
 
-		private void OnGetData(GetDataEventArgs args)
+		void OnGetData(GetDataEventArgs args)
 		{
-			if (args.Handled)
-				return;
-
-			if (args.MsgID != PacketTypes.ItemDrop && args.MsgID != PacketTypes.UpdateItemDrop)
-				return;
+			if (args.Handled)return;
+			if (args.MsgID != PacketTypes.ItemDrop && args.MsgID != PacketTypes.UpdateItemDrop)return;
 
 			using (var data = new MemoryStream(args.Msg.readBuffer, args.Index, args.Length - 1))
 			{
 				var id = data.ReadInt16();
 				var pos = new Vector2(data.ReadSingle(), data.ReadSingle());
 
-				if (id < 400)
-					return;
-
+				if (id < 400)return;
 				var rt = RtRegions.GetTopRegion(RtRegions.Regions.Where(r => r.Region.InArea((int)(pos.X / 16), (int)(pos.Y / 16))));
 
-				if (rt?.HasEvent(Event.NoItem) != true)
-					return;
+				if (rt?.HasEvent(Event.NoItem) != true)return;
 
 				var player = TShock.Players[args.Msg.whoAmI];
-				if (player == null || player.HasPermission("regiontrigger.bypass.itemdrop"))
-					return;
+				if (player == null || player.HasPermission("regiontrigger.bypass.itemdrop"))return;
 
 				player.SendErrorMessage("You cannot drop item in this region!");
 				player.Disable("drop item");
@@ -156,7 +131,7 @@ namespace RegionTrigger
 			}
 		}
 
-		private static void OnNewProjectile(object sender, GetDataHandlers.NewProjectileEventArgs args)
+		static void OnNewProjectile(object sender, GetDataHandlers.NewProjectileEventArgs args)
 		{
 			var ply = TShock.Players[args.Owner];
 			var rt = RtPlayer.GetPlayerInfo(ply).CurrentRegion;
@@ -172,21 +147,20 @@ namespace RegionTrigger
 			}
 		}
 
-		private static void OnPlayerUpdate(object sender, GetDataHandlers.PlayerUpdateEventArgs args)
+		static void OnPlayerUpdate(object sender, GetDataHandlers.PlayerUpdateEventArgs args)
 		{
 			var ply = TShock.Players[args.PlayerId];
 			var rt = RtPlayer.GetPlayerInfo(ply).CurrentRegion;
 
-			if (rt?.HasEvent(Event.Itemban) != true)
-				return;
+			if (rt?.HasEvent(Event.Itemban) != true)return;
 
-			BitsByte control = args.Control;
-			if (control[5])
+			var control = args.Control;
+			if (control.IsUsingItem)
 			{
-				var itemName = ply.TPlayer.inventory[args.Item].Name;
+				var itemName = ply.TPlayer.inventory[args.SelectedItem].Name;
 				if (rt.ItemIsBanned(itemName) && !ply.HasPermission("regiontrigger.bypass.itemban"))
 				{
-					control[5] = false;
+					control.IsUsingItem = false;
 					args.Control = control;
 					ply.Disable($"using a banned item ({itemName})", DisableFlags.WriteToLogAndConsole);
 					ply.SendErrorMessage($"You can't use {itemName} here.");
@@ -194,12 +168,12 @@ namespace RegionTrigger
 			}
 		}
 
-		private void OnRegionDeleted(RegionHooks.RegionDeletedEventArgs args)
+		void OnRegionDeleted(RegionHooks.RegionDeletedEventArgs args)
 		{
 			RtRegions.DeleteRtRegion(args.Region.ID);
 		}
 
-		private static void OnPlayerPermission(PlayerPermissionEventArgs args)
+		static void OnPlayerPermission(PlayerPermissionEventArgs args)
 		{
 			var rt = RtPlayer.GetPlayerInfo(args.Player).CurrentRegion;
 
