@@ -24,8 +24,6 @@ namespace RegionTrigger
 
 		DateTime _lastCheck = DateTime.UtcNow;
 
-		public override string Description => "Perform actions in regions where players are active.";
-
 		public RegionTrigger(Main game) : base(game) { }
 		public override void Initialize()
 		{
