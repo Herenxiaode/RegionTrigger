@@ -20,7 +20,7 @@ namespace RegionTrigger
 		public override string Name => "RegionTrigger";
 		public override string Author => "MistZZT";
 		public override Version Version => GetType().Assembly.GetName().Version;
-		public override string Description => "Perform actions in regions where players are active.";
+		public override string Description => "区域内执行特定事件.";
 
 		DateTime _lastCheck = DateTime.UtcNow;
 
@@ -62,7 +62,7 @@ namespace RegionTrigger
 
 		void OnInitialize(EventArgs args)
 		{
-			Commands.ChatCommands.Add(new Command("regiontrigger.manage", RegionSetProperties, "rt"));
+			Commands.ChatCommands.Add(new Command("regiontrigger.manage", RegionSetProperties, "rt", "区域事件"));
 			RtRegions = new RtRegionManager(TShock.DB);
 		}
 
